@@ -41,44 +41,329 @@ class NonogramGame {
     }
     
     generatePuzzle() {
-        // 生成一个随机谜题
-        this.solution = [];
-        this.userGrid = [];
+        // 生成一个随机谜题，确保有唯一解
+        let attempts = 0;
+        const maxAttempts = 50;
         
-        // 生成随机图案（30-40% 的格子被填充）
-        const fillRate = 0.35;
+        while (attempts < maxAttempts) {
+            this.solution = [];
+            this.userGrid = [];
+            
+            // 生成随机图案（填充率 40% ~ 60%）
+            const fillRate = 0.40 + Math.random() * 0.20; // 40% ~ 60%
+            
+            for (let i = 0; i < this.size; i++) {
+                this.solution[i] = [];
+                this.userGrid[i] = [];
+                for (let j = 0; j < this.size; j++) {
+                    const filled = Math.random() < fillRate;
+                    this.solution[i][j] = filled ? 1 : 0;
+                    this.userGrid[i][j] = 0; // 0: 空白, 1: 填充, 2: 标记
+                }
+            }
+            
+            // 计算提示
+            this.calculateHints();
+            
+            // 验证唯一解
+            if (this.hasUniqueSolution()) {
+                // 验证通过，使用这个谜题
+                return;
+            }
+            
+            attempts++;
+        }
+        
+        // 如果多次尝试都失败，使用最后一次生成的谜题（即使可能不是唯一解）
+        console.warn('无法生成唯一解谜题，使用当前生成的谜题');
+    }
+    
+    // 计算逻辑验证公式：S = Σ(提示数字) + (数字组数 - 1)
+    calculateMinWidth(hints) {
+        if (hints.length === 0 || (hints.length === 1 && hints[0] === 0)) {
+            return 0;
+        }
+        const sum = hints.reduce((a, b) => a + b, 0);
+        const groups = hints.length;
+        return sum + (groups - 1);
+    }
+    
+    // 检查行/列是否容易上手（S = 网格宽度）
+    isRowEasyToSolve(hints, width) {
+        const minWidth = this.calculateMinWidth(hints);
+        return minWidth === width;
+    }
+    
+    // 使用回溯搜索验证唯一解
+    hasUniqueSolution() {
+        // 对于大网格（15x15），使用简化验证（因为完全回溯太慢）
+        if (this.size >= 15) {
+            // 使用启发式方法：检查是否有多行/列满足 S = 宽度（唯一填法）
+            let easyRows = 0;
+            let easyCols = 0;
+            
+            for (let i = 0; i < this.size; i++) {
+                if (this.isRowEasyToSolve(this.rowHints[i], this.size)) {
+                    easyRows++;
+                }
+                if (this.isRowEasyToSolve(this.colHints[i], this.size)) {
+                    easyCols++;
+                }
+            }
+            
+            // 如果有足够多的"容易"行和列，认为可能是唯一解
+            return easyRows >= this.size * 0.3 && easyCols >= this.size * 0.3;
+        }
+        
+        // 对于小网格，使用完整的回溯搜索
+        const testGrid = [];
         for (let i = 0; i < this.size; i++) {
-            this.solution[i] = [];
-            this.userGrid[i] = [];
+            testGrid[i] = [];
             for (let j = 0; j < this.size; j++) {
-                const filled = Math.random() < fillRate;
-                this.solution[i][j] = filled ? 1 : 0;
-                this.userGrid[i][j] = 0; // 0: 空白, 1: 填充, 2: 标记
+                testGrid[i][j] = -1; // -1: 未确定, 0: 空白, 1: 填充
             }
         }
         
-        // 确保谜题有解（至少有一些填充的格子）
-        let hasFilled = false;
-        for (let i = 0; i < this.size; i++) {
+        // 使用回溯搜索找到所有解
+        const solutions = [];
+        this.backtrackSolve(testGrid, 0, 0, solutions);
+        
+        // 如果只有一个解，返回 true
+        return solutions.length === 1;
+    }
+    
+    // 回溯搜索求解
+    backtrackSolve(grid, row, col, solutions) {
+        // 如果已经找到多个解，停止搜索
+        if (solutions.length > 1) {
+            return;
+        }
+        
+        // 如果已经遍历完所有格子
+        if (row >= this.size) {
+            // 验证解是否正确
+            if (this.isValidSolution(grid)) {
+                // 保存解（只保存第一个解用于比较）
+                if (solutions.length === 0) {
+                    const solution = [];
+                    for (let i = 0; i < this.size; i++) {
+                        solution[i] = [];
+                        for (let j = 0; j < this.size; j++) {
+                            solution[i][j] = grid[i][j];
+                        }
+                    }
+                    solutions.push(solution);
+                } else {
+                    // 检查是否与第一个解相同
+                    let isDifferent = false;
+                    for (let i = 0; i < this.size; i++) {
+                        for (let j = 0; j < this.size; j++) {
+                            if (grid[i][j] !== solutions[0][i][j]) {
+                                isDifferent = true;
+                                break;
+                            }
+                        }
+                        if (isDifferent) break;
+                    }
+                    if (isDifferent) {
+                        solutions.push('different'); // 标记有不同解
+                    }
+                }
+            }
+            return;
+        }
+        
+        // 计算下一个位置
+        let nextRow = row;
+        let nextCol = col + 1;
+        if (nextCol >= this.size) {
+            nextRow = row + 1;
+            nextCol = 0;
+        }
+        
+        // 尝试填充
+        grid[row][col] = 1;
+        if (this.isValidPartialSolution(grid, row, col)) {
+            this.backtrackSolve(grid, nextRow, nextCol, solutions);
+        }
+        
+        // 尝试空白
+        grid[row][col] = 0;
+        if (this.isValidPartialSolution(grid, row, col)) {
+            this.backtrackSolve(grid, nextRow, nextCol, solutions);
+        }
+        
+        // 回溯
+        grid[row][col] = -1;
+    }
+    
+    // 验证部分解是否有效
+    isValidPartialSolution(grid, maxRow, maxCol) {
+        // 检查已完成的行
+        for (let i = 0; i <= maxRow; i++) {
+            const row = [];
+            let isComplete = true;
             for (let j = 0; j < this.size; j++) {
-                if (this.solution[i][j] === 1) {
-                    hasFilled = true;
+                if (grid[i][j] === -1) {
+                    isComplete = false;
                     break;
                 }
+                row.push(grid[i][j]);
             }
-            if (hasFilled) break;
-        }
-        
-        if (!hasFilled) {
-            // 如果没有任何填充，创建一个简单的图案
-            for (let i = 0; i < Math.min(3, this.size); i++) {
-                for (let j = 0; j < Math.min(3, this.size); j++) {
-                    this.solution[i][j] = 1;
+            
+            if (isComplete) {
+                const hints = this.getHintsFromRow(row);
+                if (!this.hintsMatch(hints, this.rowHints[i])) {
+                    return false;
+                }
+            } else if (i === maxRow) {
+                // 对于当前行，检查部分解是否可能
+                const partialHints = this.getPartialHintsFromRow(row, maxCol);
+                if (!this.partialHintsMatch(partialHints, this.rowHints[i])) {
+                    return false;
                 }
             }
         }
         
-        this.calculateHints();
+        // 检查已完成的列
+        for (let j = 0; j <= maxCol; j++) {
+            const col = [];
+            let isComplete = true;
+            for (let i = 0; i < this.size; i++) {
+                if (grid[i][j] === -1) {
+                    isComplete = false;
+                    break;
+                }
+                col.push(grid[i][j]);
+            }
+            
+            if (isComplete) {
+                const hints = this.getHintsFromRow(col);
+                if (!this.hintsMatch(hints, this.colHints[j])) {
+                    return false;
+                }
+            } else {
+                // 对于当前列，检查部分解是否可能
+                const partialHints = this.getPartialHintsFromRow(col, maxRow);
+                if (!this.partialHintsMatch(partialHints, this.colHints[j])) {
+                    return false;
+                }
+            }
+        }
+        
+        return true;
+    }
+    
+    // 验证完整解是否正确
+    isValidSolution(grid) {
+        // 检查所有行
+        for (let i = 0; i < this.size; i++) {
+            const row = [];
+            for (let j = 0; j < this.size; j++) {
+                row.push(grid[i][j]);
+            }
+            const hints = this.getHintsFromRow(row);
+            if (!this.hintsMatch(hints, this.rowHints[i])) {
+                return false;
+            }
+        }
+        
+        // 检查所有列
+        for (let j = 0; j < this.size; j++) {
+            const col = [];
+            for (let i = 0; i < this.size; i++) {
+                col.push(grid[i][j]);
+            }
+            const hints = this.getHintsFromRow(col);
+            if (!this.hintsMatch(hints, this.colHints[j])) {
+                return false;
+            }
+        }
+        
+        return true;
+    }
+    
+    // 从行/列获取提示
+    getHintsFromRow(row) {
+        const hints = [];
+        let count = 0;
+        for (let i = 0; i < row.length; i++) {
+            if (row[i] === 1) {
+                count++;
+            } else {
+                if (count > 0) {
+                    hints.push(count);
+                    count = 0;
+                }
+            }
+        }
+        if (count > 0) {
+            hints.push(count);
+        }
+        return hints.length > 0 ? hints : [0];
+    }
+    
+    // 获取部分提示（用于部分解验证）
+    getPartialHintsFromRow(row, maxIndex) {
+        const hints = [];
+        let count = 0;
+        for (let i = 0; i <= maxIndex; i++) {
+            if (row[i] === 1) {
+                count++;
+            } else if (row[i] === 0) {
+                if (count > 0) {
+                    hints.push(count);
+                    count = 0;
+                }
+            } else {
+                // 遇到未确定的格子，停止
+                if (count > 0) {
+                    hints.push(count);
+                }
+                break;
+            }
+        }
+        if (count > 0) {
+            hints.push(count);
+        }
+        return hints;
+    }
+    
+    // 检查提示是否匹配
+    hintsMatch(hints1, hints2) {
+        if (hints1.length !== hints2.length) {
+            return false;
+        }
+        for (let i = 0; i < hints1.length; i++) {
+            if (hints1[i] !== hints2[i]) {
+                return false;
+            }
+        }
+        return true;
+    }
+    
+    // 检查部分提示是否可能匹配
+    partialHintsMatch(partialHints, targetHints) {
+        // 部分提示必须是目标提示的前缀
+        if (partialHints.length > targetHints.length) {
+            return false;
+        }
+        
+        for (let i = 0; i < partialHints.length; i++) {
+            if (i === partialHints.length - 1) {
+                // 最后一个提示可以小于等于目标（因为可能未完成）
+                if (partialHints[i] > targetHints[i]) {
+                    return false;
+                }
+            } else {
+                // 前面的提示必须完全匹配
+                if (partialHints[i] !== targetHints[i]) {
+                    return false;
+                }
+            }
+        }
+        
+        return true;
     }
     
     calculateHints() {
