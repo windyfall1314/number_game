@@ -1,0 +1,487 @@
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    min-height: 100vh;
+    padding: 20px;
+    color: #333;
+}
+
+.container {
+    max-width: 1200px;
+    margin: 0 auto;
+    background: white;
+    border-radius: 20px;
+    padding: 30px;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+}
+
+header {
+    text-align: center;
+    margin-bottom: 30px;
+    padding-bottom: 20px;
+    border-bottom: 3px solid #667eea;
+}
+
+h1 {
+    font-size: 2.5em;
+    color: #667eea;
+    margin-bottom: 20px;
+    text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.controls {
+    display: flex;
+    justify-content: center;
+    gap: 15px;
+    flex-wrap: wrap;
+}
+
+.btn {
+    padding: 12px 24px;
+    font-size: 16px;
+    font-weight: bold;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    background: #667eea;
+    color: white;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.btn:hover {
+    background: #5568d3;
+    transform: translateY(-2px);
+    box-shadow: 0 6px 12px rgba(0, 0, 0, 0.2);
+}
+
+.btn:active {
+    transform: translateY(0);
+}
+
+.select {
+    padding: 12px 20px;
+    font-size: 16px;
+    border: 2px solid #667eea;
+    border-radius: 8px;
+    background: white;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.select:hover {
+    border-color: #5568d3;
+}
+
+.game-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    margin: 30px 0;
+}
+
+.top-section {
+    display: flex;
+    margin-bottom: 10px;
+}
+
+.corner {
+    width: 80px;
+    height: 80px;
+    flex-shrink: 0;
+}
+
+.col-hints {
+    display: flex;
+    gap: 2px;
+}
+
+.col-hint {
+    width: 40px;
+    min-height: 80px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-start;
+    padding-top: 10px;
+    font-weight: bold;
+    color: #667eea;
+    background: #f0f0f0;
+    border-radius: 4px;
+    line-height: 1.4;
+}
+
+.bottom-section {
+    display: flex;
+}
+
+.row-hints {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    margin-right: 10px;
+}
+
+.row-hint {
+    width: 80px;
+    min-height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    padding-right: 10px;
+    font-weight: bold;
+    color: #667eea;
+    background: #f0f0f0;
+    border-radius: 4px;
+}
+
+.grid {
+    display: grid;
+    gap: 2px;
+    background: #333;
+    padding: 2px;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+.cell {
+    width: 40px;
+    height: 40px;
+    background: white;
+    border: 1px solid #ddd;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    font-size: 18px;
+    transition: all 0.2s ease;
+    user-select: none;
+}
+
+.cell:hover {
+    background: #f0f0f0;
+    transform: scale(1.05);
+}
+
+.cell.filled {
+    background: #333;
+    color: white;
+}
+
+.cell.marked {
+    background: #ffebee;
+    color: #c62828;
+}
+
+.cell.marked::after {
+    content: '✕';
+}
+
+/* 答案显示模式样式 */
+.cell.solution-filled {
+    background: #4caf50;
+    color: white;
+}
+
+.cell.error {
+    position: relative;
+}
+
+.cell.error-filled {
+    background: #ffcdd2;
+    border: 3px solid #f44336;
+}
+
+.cell.error-filled::after {
+    content: '✕';
+    color: #f44336;
+    font-size: 24px;
+    font-weight: bold;
+}
+
+.cell.error-missing {
+    background: #fff3e0;
+    border: 3px solid #ff9800;
+}
+
+.cell.error-missing::after {
+    content: '?';
+    color: #ff9800;
+    font-size: 20px;
+    font-weight: bold;
+}
+
+.info {
+    margin-top: 30px;
+    padding: 20px;
+    background: #f8f9fa;
+    border-radius: 10px;
+    border-left: 4px solid #667eea;
+}
+
+.info p {
+    font-weight: bold;
+    margin-bottom: 10px;
+    color: #667eea;
+}
+
+.info ul {
+    list-style-position: inside;
+    line-height: 1.8;
+}
+
+.info li {
+    margin: 5px 0;
+}
+
+.message {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: #4caf50;
+    color: white;
+    padding: 30px 50px;
+    border-radius: 15px;
+    font-size: 24px;
+    font-weight: bold;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+    z-index: 1000;
+    display: none;
+    animation: popIn 0.5s ease;
+}
+
+.message.show {
+    display: block;
+}
+
+.message.error {
+    background: #f44336;
+}
+
+@keyframes popIn {
+    from {
+        opacity: 0;
+        transform: translate(-50%, -50%) scale(0.5);
+    }
+    to {
+        opacity: 1;
+        transform: translate(-50%, -50%) scale(1);
+    }
+}
+
+/* 推理界面样式 */
+.reasoning-overlay {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.8);
+    z-index: 2000;
+    overflow-y: auto;
+    padding: 20px;
+}
+
+.reasoning-overlay.show {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.reasoning-container {
+    background: white;
+    border-radius: 20px;
+    padding: 30px;
+    max-width: 95%;
+    max-height: 95vh;
+    overflow-y: auto;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+}
+
+.reasoning-header {
+    text-align: center;
+    margin-bottom: 20px;
+    padding-bottom: 15px;
+    border-bottom: 2px solid #667eea;
+}
+
+.reasoning-header h2 {
+    color: #667eea;
+    font-size: 2em;
+    margin-bottom: 10px;
+}
+
+.reasoning-header p {
+    color: #666;
+    font-size: 14px;
+}
+
+.reasoning-controls {
+    display: flex;
+    justify-content: center;
+    gap: 15px;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+}
+
+.btn-cancel {
+    background: #999 !important;
+}
+
+.btn-cancel:hover {
+    background: #777 !important;
+}
+
+.reasoning-game-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.reasoning-top-section {
+    display: flex;
+    margin-bottom: 10px;
+}
+
+.reasoning-corner {
+    width: 80px;
+    height: 80px;
+    flex-shrink: 0;
+}
+
+.reasoning-col-hints {
+    display: flex;
+    gap: 2px;
+}
+
+.reasoning-col-hint {
+    width: 40px;
+    min-height: 80px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-start;
+    padding-top: 10px;
+    font-weight: bold;
+    color: #667eea;
+    background: #f0f0f0;
+    border-radius: 4px;
+    line-height: 1.4;
+}
+
+.reasoning-bottom-section {
+    display: flex;
+}
+
+.reasoning-row-hints {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    margin-right: 10px;
+}
+
+.reasoning-row-hint {
+    width: 80px;
+    min-height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    padding-right: 10px;
+    font-weight: bold;
+    color: #667eea;
+    background: #f0f0f0;
+    border-radius: 4px;
+}
+
+.reasoning-grid {
+    display: grid;
+    gap: 2px;
+    background: #333;
+    padding: 2px;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+.reasoning-cell {
+    width: 40px;
+    height: 40px;
+    background: white;
+    border: 1px solid #ddd;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    font-size: 18px;
+    transition: all 0.2s ease;
+    user-select: none;
+}
+
+.reasoning-cell:hover {
+    background: #e3f2fd;
+    transform: scale(1.05);
+}
+
+.reasoning-cell.filled {
+    background: #2196f3;
+    color: white;
+}
+
+.reasoning-cell.marked {
+    background: #ffebee;
+    color: #c62828;
+}
+
+.reasoning-cell.marked::after {
+    content: '✕';
+}
+
+@media (max-width: 768px) {
+    .container {
+        padding: 15px;
+    }
+    
+    h1 {
+        font-size: 1.8em;
+    }
+    
+    .cell {
+        width: 30px;
+        height: 30px;
+        font-size: 14px;
+    }
+    
+    .row-hint, .corner {
+        width: 60px;
+    }
+    
+    .col-hint {
+        width: 30px;
+        min-height: 60px;
+    }
+    
+    .reasoning-cell {
+        width: 30px;
+        height: 30px;
+        font-size: 14px;
+    }
+    
+    .reasoning-row-hint, .reasoning-corner {
+        width: 60px;
+    }
+    
+    .reasoning-col-hint {
+        width: 30px;
+        min-height: 60px;
+    }
+}
+

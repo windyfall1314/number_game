@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>数织游戏 - Nonogram</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>数织游戏</h1>
+            <div class="controls">
+                <button id="resetBtn" class="btn">重置</button>
+                <button id="checkBtn" class="btn">检查</button>
+                <button id="reasoningBtn" class="btn">推理</button>
+                <button id="answerBtn" class="btn">答案</button>
+                <button id="newGameBtn" class="btn">新游戏</button>
+                <select id="difficultySelect" class="select">
+                    <option value="easy">简单 (5x5)</option>
+                    <option value="medium" selected>中等 (10x10)</option>
+                    <option value="hard">困难 (15x15)</option>
+                </select>
+            </div>
+        </header>
+        
+        <div class="game-container">
+            <div class="top-section">
+                <div class="corner"></div>
+                <div class="col-hints" id="colHints"></div>
+            </div>
+            <div class="bottom-section">
+                <div class="row-hints" id="rowHints"></div>
+                <div class="grid" id="grid"></div>
+            </div>
+        </div>
+        
+        <div class="info">
+            <p>使用说明：</p>
+            <ul>
+                <li>左键点击：填充格子（黑色）</li>
+                <li>右键点击：标记为空白（X）</li>
+                <li>再次点击：清除</li>
+                <li>数字提示表示该行/列中连续填充的格子数量</li>
+            </ul>
+        </div>
+        
+        <div id="message" class="message"></div>
+    </div>
+    
+    <!-- 推理界面 -->
+    <div id="reasoningOverlay" class="reasoning-overlay">
+        <div class="reasoning-container">
+            <div class="reasoning-header">
+                <h2>推理模式</h2>
+                <p>在此界面进行推理尝试，不会影响主游戏</p>
+            </div>
+            <div class="reasoning-controls">
+                <button id="applyReasoningBtn" class="btn">应用推理结果</button>
+                <button id="cancelReasoningBtn" class="btn btn-cancel">取消</button>
+                <button id="clearReasoningBtn" class="btn">清空推理</button>
+            </div>
+            <div class="reasoning-game-container">
+                <div class="reasoning-top-section">
+                    <div class="reasoning-corner"></div>
+                    <div class="reasoning-col-hints" id="reasoningColHints"></div>
+                </div>
+                <div class="reasoning-bottom-section">
+                    <div class="reasoning-row-hints" id="reasoningRowHints"></div>
+                    <div class="reasoning-grid" id="reasoningGrid"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script src="script.js"></script>
+</body>
+</html>
+
