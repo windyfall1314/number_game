@@ -64,6 +64,12 @@ class NonogramGame {
             
             // 计算提示
             this.calculateHints();
+
+            // 行和列都不能全空
+            if (!this.hasNoEmptyLinesOrCols()) {
+                attempts++;
+                continue;
+            }
             
             // 验证唯一解和逻辑可解性
             if (this.hasUniqueSolution() && this.isLogicallySolvable()) {
@@ -92,6 +98,27 @@ class NonogramGame {
     isRowEasyToSolve(hints, width) {
         const minWidth = this.calculateMinWidth(hints);
         return minWidth === width;
+    }
+
+    // 检查是否不存在整行或整列全空（提示为 [0]）
+    hasNoEmptyLinesOrCols() {
+        // 检查行
+        for (let i = 0; i < this.size; i++) {
+            const hints = this.rowHints[i];
+            if (hints.length === 1 && hints[0] === 0) {
+                return false;
+            }
+        }
+
+        // 检查列
+        for (let j = 0; j < this.size; j++) {
+            const hints = this.colHints[j];
+            if (hints.length === 1 && hints[0] === 0) {
+                return false;
+            }
+        }
+
+        return true;
     }
     
     // 使用回溯搜索验证唯一解
