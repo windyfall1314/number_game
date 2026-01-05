@@ -49,8 +49,8 @@ class NonogramGame {
             this.solution = [];
             this.userGrid = [];
             
-            // 生成随机图案（填充率 40% ~ 60%）
-            const fillRate = 0.40 + Math.random() * 0.20; // 40% ~ 60%
+            // 生成随机图案（填充率 50% ~ 60%）
+            const fillRate = 0.50 + Math.random() * 0.10; // 50% ~ 60%
             
             for (let i = 0; i < this.size; i++) {
                 this.solution[i] = [];
@@ -65,8 +65,8 @@ class NonogramGame {
             // 计算提示
             this.calculateHints();
             
-            // 验证唯一解
-            if (this.hasUniqueSolution()) {
+            // 验证唯一解和逻辑可解性
+            if (this.hasUniqueSolution() && this.isLogicallySolvable()) {
                 // 验证通过，使用这个谜题
                 return;
             }
@@ -363,6 +363,289 @@ class NonogramGame {
             }
         }
         
+        return true;
+    }
+    
+    // ========== 逻辑可解性验证算法 ==========
+    
+    // 检查谜题是否可以通过逻辑推理解决（无需猜测）
+    isLogicallySolvable() {
+        // 创建逻辑求解网格：-1: 未知, 0: 确定为白, 1: 确定为黑
+        const logicalGrid = [];
+        for (let i = 0; i < this.size; i++) {
+            logicalGrid[i] = [];
+            for (let j = 0; j < this.size; j++) {
+                logicalGrid[i][j] = -1; // 初始化为未知
+            }
+        }
+        
+        // 执行逻辑求解
+        const result = this.logicalSolve(logicalGrid);
+        
+        // 检查是否完全求解（没有未知格子）
+        if (result.solved) {
+            // 验证求解结果是否正确
+            return this.validateLogicalSolution(logicalGrid);
+        }
+        
+        return false;
+    }
+    
+    // 全局迭代传播算法
+    logicalSolve(grid) {
+        const queue = new Set(); // 待检查的行/列队列
+        const maxIterations = 100; // 最大迭代次数，防止无限循环
+        let iterations = 0;
+        let hasProgress = true;
+        
+        // 初始化：将所有行和列加入队列
+        for (let i = 0; i < this.size; i++) {
+            queue.add(`row_${i}`);
+            queue.add(`col_${i}`);
+        }
+        
+        while (queue.size > 0 && hasProgress && iterations < maxIterations) {
+            iterations++;
+            hasProgress = false;
+            const currentQueue = Array.from(queue);
+            queue.clear();
+            
+            for (const item of currentQueue) {
+                const [type, index] = item.split('_');
+                const idx = parseInt(index);
+                
+                let changed = false;
+                if (type === 'row') {
+                    changed = this.solveLine(this.rowHints[idx], this.size, grid[idx], idx, 'row', grid);
+                } else {
+                    // 提取列数据
+                    const colData = [];
+                    for (let i = 0; i < this.size; i++) {
+                        colData.push(grid[i][idx]);
+                    }
+                    const newColData = [...colData];
+                    changed = this.solveLine(this.colHints[idx], this.size, newColData, idx, 'col', grid);
+                    // 将结果写回网格
+                    if (changed) {
+                        for (let i = 0; i < this.size; i++) {
+                            if (newColData[i] !== -1 && grid[i][idx] === -1) {
+                                grid[i][idx] = newColData[i];
+                            }
+                        }
+                    }
+                }
+                
+                if (changed) {
+                    hasProgress = true;
+                    // 将受影响的行/列加入队列
+                    if (type === 'row') {
+                        for (let j = 0; j < this.size; j++) {
+                            if (grid[idx][j] !== -1) {
+                                queue.add(`col_${j}`);
+                            }
+                        }
+                    } else {
+                        for (let i = 0; i < this.size; i++) {
+                            if (grid[i][idx] !== -1) {
+                                queue.add(`row_${i}`);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        
+        // 检查是否完全求解
+        let solved = true;
+        for (let i = 0; i < this.size; i++) {
+            for (let j = 0; j < this.size; j++) {
+                if (grid[i][j] === -1) {
+                    solved = false;
+                    break;
+                }
+            }
+            if (!solved) break;
+        }
+        
+        return { solved, grid };
+    }
+    
+    // 单行/列的逻辑求解（取交集）
+    solveLine(hints, width, currentState, lineIndex, type, fullGrid) {
+        // 如果提示为空或只有0，该行/列全为空白
+        if (hints.length === 0 || (hints.length === 1 && hints[0] === 0)) {
+            let changed = false;
+            for (let i = 0; i < width; i++) {
+                if (currentState[i] === -1) {
+                    currentState[i] = 0;
+                    changed = true;
+                }
+            }
+            return changed;
+        }
+        
+        // 生成所有符合提示的排列组合
+        const combinations = this.generateAllCombinations(hints, width, currentState);
+        
+        if (combinations.length === 0) {
+            // 无解，返回false（表示冲突）
+            return false;
+        }
+        
+        // 取交集
+        const intersection = this.getIntersection(combinations, width);
+        
+        // 应用交集结果到当前状态
+        let changed = false;
+        for (let i = 0; i < width; i++) {
+            if (intersection[i] !== -1 && currentState[i] === -1) {
+                currentState[i] = intersection[i];
+                changed = true;
+            }
+        }
+        
+        // 如果是行，更新完整网格
+        if (type === 'row' && changed) {
+            for (let j = 0; j < width; j++) {
+                if (currentState[j] !== -1) {
+                    fullGrid[lineIndex][j] = currentState[j];
+                }
+            }
+        }
+        
+        return changed;
+    }
+    
+    // 生成所有符合提示的排列组合
+    generateAllCombinations(hints, width, currentState) {
+        const combinations = [];
+        
+        // 递归生成所有可能的排列
+        const generate = (hintIndex, startPos, currentCombination) => {
+            if (hintIndex >= hints.length) {
+                // 所有提示都已放置，检查剩余位置是否都是空白
+                const combination = [...currentCombination];
+                for (let i = startPos; i < width; i++) {
+                    combination[i] = 0;
+                }
+                
+                // 检查是否符合当前已知状态
+                if (this.isCompatible(combination, currentState)) {
+                    combinations.push(combination);
+                }
+                return;
+            }
+            
+            const hintValue = hints[hintIndex];
+            const remainingHints = hints.slice(hintIndex + 1);
+            // 计算剩余提示所需的最小空间：所有提示值的和 + 分隔空白的数量
+            const minSpaceNeeded = remainingHints.length > 0 
+                ? remainingHints.reduce((sum, h) => sum + h, 0) + (remainingHints.length - 1)
+                : 0;
+            const maxStart = width - hintValue - minSpaceNeeded;
+            
+            // 尝试在当前提示的所有可能位置放置
+            for (let pos = startPos; pos <= maxStart; pos++) {
+                // 检查是否可以在这个位置放置
+                let canPlace = true;
+                const newCombination = [...currentCombination];
+                
+                // 检查放置位置之前是否有足够的空白
+                for (let i = startPos; i < pos; i++) {
+                    if (currentState[i] === 1) {
+                        canPlace = false;
+                        break;
+                    }
+                }
+                
+                if (!canPlace) continue;
+                
+                // 放置当前提示的连续块
+                for (let i = pos; i < pos + hintValue; i++) {
+                    if (currentState[i] === 0) {
+                        canPlace = false;
+                        break;
+                    }
+                    newCombination[i] = 1;
+                }
+                
+                if (!canPlace) continue;
+                
+                // 如果后面还有提示，需要至少一个空白分隔
+                if (hintIndex < hints.length - 1) {
+                    if (pos + hintValue < width) {
+                        newCombination[pos + hintValue] = 0;
+                    }
+                }
+                
+                // 递归处理下一个提示
+                generate(hintIndex + 1, pos + hintValue + 1, newCombination);
+            }
+        };
+        
+        // 初始化组合数组
+        const initialCombination = new Array(width).fill(-1);
+        generate(0, 0, initialCombination);
+        
+        return combinations;
+    }
+    
+    // 检查组合是否与当前已知状态兼容
+    isCompatible(combination, currentState) {
+        for (let i = 0; i < combination.length; i++) {
+            if (currentState[i] !== -1 && combination[i] !== currentState[i]) {
+                return false;
+            }
+        }
+        return true;
+    }
+    
+    // 取所有组合的交集
+    getIntersection(combinations, width) {
+        if (combinations.length === 0) {
+            return new Array(width).fill(-1);
+        }
+        
+        const intersection = new Array(width).fill(-1);
+        
+        // 对于每个位置，检查所有组合的值
+        for (let i = 0; i < width; i++) {
+            let allBlack = true;
+            let allWhite = true;
+            
+            for (const combination of combinations) {
+                if (combination[i] === 1) {
+                    allWhite = false;
+                } else {
+                    allBlack = false;
+                }
+            }
+            
+            if (allBlack) {
+                intersection[i] = 1; // 所有组合都是黑色
+            } else if (allWhite) {
+                intersection[i] = 0; // 所有组合都是白色
+            } else {
+                intersection[i] = -1; // 不确定
+            }
+        }
+        
+        return intersection;
+    }
+    
+    // 验证逻辑求解结果是否正确
+    validateLogicalSolution(logicalGrid) {
+        // 检查逻辑求解结果是否与正确答案匹配
+        for (let i = 0; i < this.size; i++) {
+            for (let j = 0; j < this.size; j++) {
+                const logicalValue = logicalGrid[i][j];
+                const solutionValue = this.solution[i][j];
+                
+                if (logicalValue !== solutionValue) {
+                    return false;
+                }
+            }
+        }
         return true;
     }
     
