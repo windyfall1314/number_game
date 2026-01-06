@@ -50,7 +50,7 @@ class NonogramGame {
             this.userGrid = [];
             
             // 生成随机图案（填充率 50% ~ 60%）
-            const fillRate = 0.50 + Math.random() * 0.10; // 50% ~ 60%
+            const fillRate = 0.40 + Math.random() * 0.20; // 40% ~ 60%
             
             for (let i = 0; i < this.size; i++) {
                 this.solution[i] = [];
