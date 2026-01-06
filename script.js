@@ -16,11 +16,28 @@ class NonogramGame {
         this.init();
     }
     
-    init() {
+    async init() {
         this.setupEventListeners();
-        this.generatePuzzle();
+        
+        // 显示初始加载状态
+        this.showLoading();
+        
+        // 使用 requestAnimationFrame 确保 UI 更新后再执行生成
+        await new Promise(resolve => {
+            requestAnimationFrame(() => {
+                requestAnimationFrame(() => {
+                    resolve();
+                });
+            });
+        });
+        
+        // 异步生成谜题
+        await this.generatePuzzleAsync();
         this.render();
         this.updateAnswerButton();
+        
+        // 隐藏加载状态
+        this.hideLoading();
     }
     
     setupEventListeners() {
@@ -50,7 +67,7 @@ class NonogramGame {
             this.userGrid = [];
             
             // 生成随机图案（填充率 50% ~ 60%）
-            const fillRate = 0.40 + Math.random() * 0.20; // 40% ~ 60%
+            const fillRate = 0.50 + Math.random() * 0.10; // 50% ~ 60%
             
             for (let i = 0; i < this.size; i++) {
                 this.solution[i] = [];
@@ -71,6 +88,12 @@ class NonogramGame {
                 continue;
             }
             
+            // 行和列都不能全满
+            if (!this.hasNoFullLinesOrCols()) {
+                attempts++;
+                continue;
+            }
+            
             // 验证唯一解和逻辑可解性
             if (this.hasUniqueSolution() && this.isLogicallySolvable()) {
                 // 验证通过，使用这个谜题
@@ -78,6 +101,73 @@ class NonogramGame {
             }
             
             attempts++;
+        }
+        
+        // 如果多次尝试都失败，使用最后一次生成的谜题（即使可能不是唯一解）
+        console.warn('无法生成唯一解谜题，使用当前生成的谜题');
+    }
+    
+    // 异步版本的生成函数，避免阻塞UI
+    async generatePuzzleAsync() {
+        // 生成一个随机谜题，确保有唯一解
+        let attempts = 0;
+        const maxAttempts = 50;
+        
+        while (attempts < maxAttempts) {
+            this.solution = [];
+            this.userGrid = [];
+            
+            // 生成随机图案（填充率 40% ~ 60%）
+            const fillRate = 0.40 + Math.random() * 0.20; // 40% ~ 60%
+            
+            for (let i = 0; i < this.size; i++) {
+                this.solution[i] = [];
+                this.userGrid[i] = [];
+                for (let j = 0; j < this.size; j++) {
+                    const filled = Math.random() < fillRate;
+                    this.solution[i][j] = filled ? 1 : 0;
+                    this.userGrid[i][j] = 0; // 0: 空白, 1: 填充, 2: 标记
+                }
+            }
+            
+            // 计算提示
+            this.calculateHints();
+
+            // 行和列都不能全空
+            if (!this.hasNoEmptyLinesOrCols()) {
+                attempts++;
+                // 每5次尝试让出控制权，避免阻塞UI
+                if (attempts % 5 === 0) {
+                    await new Promise(resolve => setTimeout(resolve, 0));
+                }
+                continue;
+            }
+            
+            // 行和列都不能全满
+            if (!this.hasNoFullLinesOrCols()) {
+                attempts++;
+                // 每5次尝试让出控制权，避免阻塞UI
+                if (attempts % 5 === 0) {
+                    await new Promise(resolve => setTimeout(resolve, 0));
+                }
+                continue;
+            }
+            
+            // 验证唯一解和逻辑可解性（这些操作可能耗时）
+            // 在验证前让出控制权，确保UI能更新
+            await new Promise(resolve => setTimeout(resolve, 0));
+            
+            if (this.hasUniqueSolution() && this.isLogicallySolvable()) {
+                // 验证通过，使用这个谜题
+                return;
+            }
+            
+            attempts++;
+            
+            // 每5次尝试让出控制权，避免阻塞UI
+            if (attempts % 5 === 0) {
+                await new Promise(resolve => setTimeout(resolve, 0));
+            }
         }
         
         // 如果多次尝试都失败，使用最后一次生成的谜题（即使可能不是唯一解）
@@ -115,6 +205,35 @@ class NonogramGame {
             const hints = this.colHints[j];
             if (hints.length === 1 && hints[0] === 0) {
                 return false;
+            }
+        }
+
+        return true;
+    }
+    
+    // 检查是否存在整行或整列全满（提示数字总和等于网格宽度）
+    hasNoFullLinesOrCols() {
+        // 检查行
+        for (let i = 0; i < this.size; i++) {
+            const hints = this.rowHints[i];
+            if (hints.length > 0 && hints[0] !== 0) {
+                const sum = hints.reduce((a, b) => a + b, 0);
+                // 如果提示总和等于网格宽度，说明该行全满
+                if (sum === this.size) {
+                    return false;
+                }
+            }
+        }
+
+        // 检查列
+        for (let j = 0; j < this.size; j++) {
+            const hints = this.colHints[j];
+            if (hints.length > 0 && hints[0] !== 0) {
+                const sum = hints.reduce((a, b) => a + b, 0);
+                // 如果提示总和等于网格宽度，说明该列全满
+                if (sum === this.size) {
+                    return false;
+                }
             }
         }
 
@@ -955,11 +1074,44 @@ class NonogramGame {
         }, 3000);
     }
     
-    newGame() {
+    async newGame() {
         this.showAnswer = false; // 新游戏时关闭答案显示
-        this.generatePuzzle();
+        
+        // 显示加载状态
+        this.showLoading();
+        
+        // 使用 requestAnimationFrame 确保 UI 更新后再执行生成
+        await new Promise(resolve => {
+            requestAnimationFrame(() => {
+                requestAnimationFrame(() => {
+                    resolve();
+                });
+            });
+        });
+        
+        // 异步生成谜题
+        await this.generatePuzzleAsync();
         this.render();
         this.updateAnswerButton();
+        
+        // 隐藏加载状态
+        this.hideLoading();
+    }
+    
+    // 显示加载状态
+    showLoading() {
+        const loadingOverlay = document.getElementById('loadingOverlay');
+        if (loadingOverlay) {
+            loadingOverlay.classList.add('show');
+        }
+    }
+    
+    // 隐藏加载状态
+    hideLoading() {
+        const loadingOverlay = document.getElementById('loadingOverlay');
+        if (loadingOverlay) {
+            loadingOverlay.classList.remove('show');
+        }
     }
     
     toggleAnswer() {
