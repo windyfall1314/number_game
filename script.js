@@ -272,42 +272,256 @@ class NonogramGame {
         return true;
     }
     
-    // 使用回溯搜索验证唯一解
+    // 使用优化的唯一性检测：先逻辑求解，后有限递归
     hasUniqueSolution() {
-        // 对于大网格（15x15），使用简化验证（因为完全回溯太慢）
-        if (this.size >= 15) {
-            // 使用启发式方法：检查是否有多行/列满足 S = 宽度（唯一填法）
-            let easyRows = 0;
-            let easyCols = 0;
-            
-            for (let i = 0; i < this.size; i++) {
-                if (this.isRowEasyToSolve(this.rowHints[i], this.size)) {
-                    easyRows++;
-                }
-                if (this.isRowEasyToSolve(this.colHints[i], this.size)) {
-                    easyCols++;
-                }
-            }
-            
-            // 如果有足够多的"容易"行和列，认为可能是唯一解
-            return easyRows >= this.size * 0.3 && easyCols >= this.size * 0.3;
-        }
-        
-        // 对于小网格，使用完整的回溯搜索
-        const testGrid = [];
+        // 阶段一：快速逻辑求解
+        const logicalGrid = [];
         for (let i = 0; i < this.size; i++) {
-            testGrid[i] = [];
+            logicalGrid[i] = [];
             for (let j = 0; j < this.size; j++) {
-                testGrid[i][j] = -1; // -1: 未确定, 0: 空白, 1: 填充
+                logicalGrid[i][j] = -1; // -1: 未知, 0: 空白, 1: 填充
             }
         }
         
-        // 使用回溯搜索找到所有解
-        const solutions = [];
-        this.backtrackSolve(testGrid, 0, 0, solutions);
+        const logicalResult = this.logicalSolve(logicalGrid);
         
-        // 如果只有一个解，返回 true
-        return solutions.length === 1;
+        // 结果 A：如果棋盘被填满 -> 谜题有效且适合人类
+        if (logicalResult.solved) {
+            // 验证求解结果是否正确
+            return this.validateLogicalSolution(logicalGrid);
+        }
+        
+        // 结果 B：如果出现冲突 -> 无解，丢弃
+        if (this.hasConflict(logicalGrid)) {
+            return false;
+        }
+        
+        // 结果 C：如果有剩余空格（卡住了） -> 进入阶段二：有限递归
+        return this.checkUniquenessWithLimitedRecursion(logicalGrid);
+    }
+    
+    // 检查网格是否有冲突
+    hasConflict(grid) {
+        // 检查所有行
+        for (let i = 0; i < this.size; i++) {
+            const row = [];
+            for (let j = 0; j < this.size; j++) {
+                row.push(grid[i][j]);
+            }
+            if (!this.isLineValid(row, this.rowHints[i])) {
+                return true;
+            }
+        }
+        
+        // 检查所有列
+        for (let j = 0; j < this.size; j++) {
+            const col = [];
+            for (let i = 0; i < this.size; i++) {
+                col.push(grid[i][j]);
+            }
+            if (!this.isLineValid(col, this.colHints[j])) {
+                return true;
+            }
+        }
+        
+        return false;
+    }
+    
+    // 检查一行/列的部分解是否有效
+    isLineValid(line, hints) {
+        const currentHints = [];
+        let count = 0;
+        let hasUncertainty = false;
+        
+        for (let i = 0; i < line.length; i++) {
+            if (line[i] === 1) {
+                count++;
+            } else if (line[i] === 0) {
+                if (count > 0) {
+                    currentHints.push(count);
+                    count = 0;
+                }
+            } else {
+                // 遇到未知格子
+                hasUncertainty = true;
+                if (count > 0) {
+                    // 当前块可能未完成
+                    break;
+                }
+            }
+        }
+        
+        if (count > 0 && !hasUncertainty) {
+            currentHints.push(count);
+        }
+        
+        // 检查当前提示是否是目标提示的前缀
+        if (currentHints.length > hints.length) {
+            return false;
+        }
+        
+        for (let i = 0; i < currentHints.length; i++) {
+            if (i === currentHints.length - 1 && hasUncertainty) {
+                // 最后一个提示可以小于等于目标（因为可能未完成）
+                if (currentHints[i] > hints[i]) {
+                    return false;
+                }
+            } else {
+                // 前面的提示必须完全匹配
+                if (currentHints[i] !== hints[i]) {
+                    return false;
+                }
+            }
+        }
+        
+        return true;
+    }
+    
+    // 阶段二：有限递归检查唯一性
+    checkUniquenessWithLimitedRecursion(grid) {
+        // 找到第一个未知格子
+        let unknownRow = -1;
+        let unknownCol = -1;
+        
+        for (let i = 0; i < this.size; i++) {
+            for (let j = 0; j < this.size; j++) {
+                if (grid[i][j] === -1) {
+                    unknownRow = i;
+                    unknownCol = j;
+                    break;
+                }
+            }
+            if (unknownRow !== -1) break;
+        }
+        
+        // 如果没有未知格子，验证解
+        if (unknownRow === -1) {
+            return this.validateLogicalSolution(grid);
+        }
+        
+        // 限制递归深度，避免性能问题
+        const maxDepth = Math.min(10, this.size * this.size / 10);
+        return this.limitedRecursiveCheck(grid, unknownRow, unknownCol, 0, maxDepth);
+    }
+    
+    // 有限递归检查
+    limitedRecursiveCheck(grid, row, col, depth, maxDepth) {
+        if (depth >= maxDepth) {
+            // 达到最大深度，假设有唯一解（保守策略）
+            return true;
+        }
+        
+        // 分支1：假设该格为"黑"
+        const grid1 = grid.map(r => [...r]);
+        grid1[row][col] = 1;
+        
+        // 运行逻辑求解器
+        const result1 = this.logicalSolve(grid1);
+        let solution1 = null;
+        
+        if (result1.solved) {
+            if (this.validateLogicalSolution(grid1)) {
+                solution1 = grid1.map(r => [...r]);
+            } else {
+                solution1 = 'invalid';
+            }
+        } else if (this.hasConflict(grid1)) {
+            solution1 = 'invalid';
+        } else {
+            // 继续递归
+            const nextUnknown = this.findNextUnknown(grid1);
+            if (nextUnknown) {
+                const recursiveResult = this.limitedRecursiveCheck(grid1, nextUnknown.row, nextUnknown.col, depth + 1, maxDepth);
+                if (recursiveResult === true) {
+                    solution1 = grid1.map(r => [...r]);
+                } else if (recursiveResult === false) {
+                    solution1 = 'invalid';
+                } else {
+                    solution1 = recursiveResult;
+                }
+            }
+        }
+        
+        // 分支2：假设该格为"白"
+        const grid2 = grid.map(r => [...r]);
+        grid2[row][col] = 0;
+        
+        // 运行逻辑求解器
+        const result2 = this.logicalSolve(grid2);
+        let solution2 = null;
+        
+        if (result2.solved) {
+            if (this.validateLogicalSolution(grid2)) {
+                solution2 = grid2.map(r => [...r]);
+            } else {
+                solution2 = 'invalid';
+            }
+        } else if (this.hasConflict(grid2)) {
+            solution2 = 'invalid';
+        } else {
+            // 继续递归
+            const nextUnknown = this.findNextUnknown(grid2);
+            if (nextUnknown) {
+                const recursiveResult = this.limitedRecursiveCheck(grid2, nextUnknown.row, nextUnknown.col, depth + 1, maxDepth);
+                if (recursiveResult === true) {
+                    solution2 = grid2.map(r => [...r]);
+                } else if (recursiveResult === false) {
+                    solution2 = 'invalid';
+                } else {
+                    solution2 = recursiveResult;
+                }
+            }
+        }
+        
+        // 判定结果
+        if (solution1 === 'invalid' && solution2 === 'invalid') {
+            return false; // 两个分支都无解 -> 原题无解
+        }
+        
+        if (solution1 === 'invalid') {
+            // 分支1无解，分支2有解 -> 该格确定为白
+            return true; // 继续求解
+        }
+        
+        if (solution2 === 'invalid') {
+            // 分支2无解，分支1有解 -> 该格确定为黑
+            return true; // 继续求解
+        }
+        
+        if (solution1 !== null && solution2 !== null && solution1 !== 'invalid' && solution2 !== 'invalid') {
+            // 两个分支都有解，检查是否相同
+            if (this.solutionsEqual(solution1, solution2)) {
+                return true; // 唯一解
+            } else {
+                return false; // 多重解（无效谜题）
+            }
+        }
+        
+        return true; // 保守策略：假设有唯一解
+    }
+    
+    // 找到下一个未知格子
+    findNextUnknown(grid) {
+        for (let i = 0; i < this.size; i++) {
+            for (let j = 0; j < this.size; j++) {
+                if (grid[i][j] === -1) {
+                    return { row: i, col: j };
+                }
+            }
+        }
+        return null;
+    }
+    
+    // 比较两个解是否相同
+    solutionsEqual(solution1, solution2) {
+        for (let i = 0; i < this.size; i++) {
+            for (let j = 0; j < this.size; j++) {
+                if (solution1[i][j] !== solution2[i][j]) {
+                    return false;
+                }
+            }
+        }
+        return true;
     }
     
     // 回溯搜索求解
@@ -662,22 +876,19 @@ class NonogramGame {
             return changed;
         }
         
-        // 生成所有符合提示的排列组合
-        const combinations = this.generateAllCombinations(hints, width, currentState);
+        // 使用左右边界法（Left-Right Overlap）快速求解
+        const result = this.solveLineWithOverlap(hints, width, currentState);
         
-        if (combinations.length === 0) {
+        if (result === null) {
             // 无解，返回false（表示冲突）
             return false;
         }
         
-        // 取交集
-        const intersection = this.getIntersection(combinations, width);
-        
-        // 应用交集结果到当前状态
+        // 应用结果到当前状态
         let changed = false;
         for (let i = 0; i < width; i++) {
-            if (intersection[i] !== -1 && currentState[i] === -1) {
-                currentState[i] = intersection[i];
+            if (result[i] !== -1 && currentState[i] === -1) {
+                currentState[i] = result[i];
                 changed = true;
             }
         }
@@ -692,6 +903,177 @@ class NonogramGame {
         }
         
         return changed;
+    }
+    
+    // 左右边界法（Left-Right Overlap）- 快速逻辑求解
+    solveLineWithOverlap(hints, width, currentState) {
+        // 计算左边界（Left Bound）：将所有数字块尽可能靠左放置
+        const leftBounds = this.calculateLeftBounds(hints, width, currentState);
+        if (leftBounds === null) return null;
+        
+        // 计算右边界（Right Bound）：将所有数字块尽可能靠右放置
+        const rightBounds = this.calculateRightBounds(hints, width, currentState);
+        if (rightBounds === null) return null;
+        
+        // 初始化结果数组
+        const result = new Array(width).fill(-1);
+        
+        // 计算重叠区间，确定哪些位置必然是黑色
+        for (let i = 0; i < hints.length; i++) {
+            const hintLen = hints[i];
+            const leftStart = leftBounds[i];
+            const rightStart = rightBounds[i];
+            
+            // 重叠区间：[rightStart, leftStart + hintLen - 1]
+            // 只有当 rightStart < leftStart + hintLen 时才有重叠
+            if (rightStart < leftStart + hintLen) {
+                const overlapStart = rightStart;
+                const overlapEnd = leftStart + hintLen - 1;
+                
+                // 重叠区域必然是黑色
+                for (let pos = overlapStart; pos <= overlapEnd; pos++) {
+                    if (pos >= 0 && pos < width) {
+                        // 检查是否与已知状态冲突
+                        if (currentState[pos] === 0) {
+                            return null; // 冲突，无解
+                        }
+                        result[pos] = 1;
+                    }
+                }
+            }
+        }
+        
+        // 确定空白位置：在已知黑色块之间的空白区域
+        // 以及左右边界之外的区域
+        for (let i = 0; i < width; i++) {
+            if (result[i] === -1) {
+                // 检查这个位置是否在所有可能的黑色块范围之外
+                let canBeBlack = false;
+                for (let j = 0; j < hints.length; j++) {
+                    const hintLen = hints[j];
+                    const leftStart = leftBounds[j];
+                    const rightStart = rightBounds[j];
+                    if (i >= leftStart && i < leftStart + hintLen) {
+                        canBeBlack = true;
+                        break;
+                    }
+                    if (i >= rightStart && i < rightStart + hintLen) {
+                        canBeBlack = true;
+                        break;
+                    }
+                }
+                
+                // 如果这个位置不可能在任何黑色块中，且已知状态不是黑色，则确定为白色
+                if (!canBeBlack && currentState[i] !== 1) {
+                    result[i] = 0;
+                }
+            }
+        }
+        
+        return result;
+    }
+    
+    // 计算左边界：将所有数字块尽可能靠左放置
+    calculateLeftBounds(hints, width, currentState) {
+        const bounds = [];
+        let currentPos = 0;
+        
+        for (let i = 0; i < hints.length; i++) {
+            const hintLen = hints[i];
+            
+            // 跳过当前位置之前的已知白色格子
+            while (currentPos < width && currentState[currentPos] === 0) {
+                currentPos++;
+            }
+            
+            // 检查是否可以放置
+            if (currentPos + hintLen > width) {
+                return null; // 无法放置，无解
+            }
+            
+            // 检查放置位置是否与已知状态冲突
+            let canPlace = true;
+            for (let j = currentPos; j < currentPos + hintLen; j++) {
+                if (currentState[j] === 0) {
+                    canPlace = false;
+                    // 移动到冲突位置之后
+                    currentPos = j + 1;
+                    break;
+                }
+            }
+            
+            if (!canPlace) {
+                // 重新尝试从新位置开始
+                i--; // 回退，重新尝试当前提示
+                continue;
+            }
+            
+            bounds.push(currentPos);
+            currentPos += hintLen;
+            
+            // 如果后面还有提示，需要至少一个空白分隔
+            if (i < hints.length - 1) {
+                if (currentPos >= width) {
+                    return null; // 没有足够空间
+                }
+                currentPos++; // 跳过分隔空白
+            }
+        }
+        
+        return bounds;
+    }
+    
+    // 计算右边界：将所有数字块尽可能靠右放置
+    calculateRightBounds(hints, width, currentState) {
+        const bounds = [];
+        let currentPos = width - 1;
+        
+        // 从右到左处理
+        for (let i = hints.length - 1; i >= 0; i--) {
+            const hintLen = hints[i];
+            
+            // 跳过当前位置之后的已知白色格子
+            while (currentPos >= 0 && currentState[currentPos] === 0) {
+                currentPos--;
+            }
+            
+            // 检查是否可以放置
+            if (currentPos - hintLen + 1 < 0) {
+                return null; // 无法放置，无解
+            }
+            
+            const startPos = currentPos - hintLen + 1;
+            
+            // 检查放置位置是否与已知状态冲突
+            let canPlace = true;
+            for (let j = startPos; j <= currentPos; j++) {
+                if (currentState[j] === 0) {
+                    canPlace = false;
+                    // 移动到冲突位置之前
+                    currentPos = j - 1;
+                    break;
+                }
+            }
+            
+            if (!canPlace) {
+                // 重新尝试从新位置开始
+                i++; // 回退，重新尝试当前提示
+                continue;
+            }
+            
+            bounds.unshift(startPos); // 从前面插入，保持顺序
+            currentPos = startPos - 1;
+            
+            // 如果前面还有提示，需要至少一个空白分隔
+            if (i > 0) {
+                if (currentPos < 0) {
+                    return null; // 没有足够空间
+                }
+                currentPos--; // 跳过分隔空白
+            }
+        }
+        
+        return bounds;
     }
     
     // 生成所有符合提示的排列组合
