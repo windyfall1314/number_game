@@ -19,8 +19,14 @@ class NonogramGame {
     async init() {
         this.setupEventListeners();
         
+        // 确保 DOM 完全加载后再显示 loading
+        await this.waitForDOMReady();
+        
         // 显示初始加载状态
         this.showLoading();
+        
+        // 强制浏览器重排，确保 loading 元素可见
+        this.forceReflow();
         
         // 使用 requestAnimationFrame 确保 UI 更新后再执行生成
         await new Promise(resolve => {
@@ -38,6 +44,32 @@ class NonogramGame {
         
         // 隐藏加载状态
         this.hideLoading();
+    }
+    
+    // 等待 DOM 完全准备好
+    waitForDOMReady() {
+        return new Promise(resolve => {
+            if (document.readyState === 'complete' || document.readyState === 'interactive') {
+                // DOM 已经准备好，但再等一个事件循环确保所有元素都已渲染
+                setTimeout(resolve, 0);
+            } else {
+                window.addEventListener('load', () => {
+                    setTimeout(resolve, 0);
+                });
+            }
+        });
+    }
+    
+    // 强制浏览器重排，确保样式应用
+    forceReflow() {
+        const loadingOverlay = document.getElementById('loadingOverlay');
+        if (loadingOverlay) {
+            // 触发重排
+            void loadingOverlay.offsetHeight;
+            // 强制应用样式
+            loadingOverlay.style.display = 'flex';
+            void loadingOverlay.offsetHeight;
+        }
     }
     
     setupEventListeners() {
@@ -1080,6 +1112,9 @@ class NonogramGame {
         // 显示加载状态
         this.showLoading();
         
+        // 强制重排，确保 loading 可见
+        this.forceReflow();
+        
         // 使用 requestAnimationFrame 确保 UI 更新后再执行生成
         await new Promise(resolve => {
             requestAnimationFrame(() => {
@@ -1102,7 +1137,16 @@ class NonogramGame {
     showLoading() {
         const loadingOverlay = document.getElementById('loadingOverlay');
         if (loadingOverlay) {
+            // 先确保元素可见
+            loadingOverlay.style.display = 'flex';
+            // 强制重排
+            void loadingOverlay.offsetHeight;
+            // 添加 show 类触发动画
             loadingOverlay.classList.add('show');
+            // 再次强制重排确保动画开始
+            void loadingOverlay.offsetHeight;
+        } else {
+            console.warn('Loading overlay element not found');
         }
     }
     
@@ -1111,6 +1155,12 @@ class NonogramGame {
         const loadingOverlay = document.getElementById('loadingOverlay');
         if (loadingOverlay) {
             loadingOverlay.classList.remove('show');
+            // 延迟移除 display，确保动画完成
+            setTimeout(() => {
+                if (!loadingOverlay.classList.contains('show')) {
+                    loadingOverlay.style.display = 'none';
+                }
+            }, 300);
         }
     }
     
@@ -1351,8 +1401,42 @@ document.addEventListener('contextmenu', (e) => {
     }
 });
 
-// 初始化游戏
-document.addEventListener('DOMContentLoaded', () => {
-    new NonogramGame();
-});
+// 初始化游戏 - 兼容多种加载方式，确保在 GitHub Pages 上正常工作
+(function() {
+    function initGame() {
+        // 确保所有必要的元素都存在
+        const requiredElements = ['loadingOverlay', 'grid', 'rowHints', 'colHints'];
+        const allElementsExist = requiredElements.every(id => {
+            const element = document.getElementById(id);
+            if (!element) {
+                console.warn(`Required element #${id} not found`);
+                return false;
+            }
+            return true;
+        });
+        
+        if (allElementsExist) {
+            try {
+                new NonogramGame();
+            } catch (error) {
+                console.error('Failed to initialize game:', error);
+            }
+        } else {
+            // 如果元素还没准备好，等待一下再试
+            setTimeout(initGame, 100);
+        }
+    }
+    
+    // 兼容多种 DOM 就绪状态
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initGame);
+    } else {
+        // DOM 已经加载完成
+        if (document.readyState === 'complete') {
+            initGame();
+        } else {
+            window.addEventListener('load', initGame);
+        }
+    }
+})();
 
